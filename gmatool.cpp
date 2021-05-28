@@ -470,7 +470,6 @@ int gmatplMerge(string filename1, string filename2) {
 	uint32_t gma1datalength = gma1filelength - gma1headerlength;
 	uint32_t gma2filelength = getFileLength(gma2);
 	uint32_t gma2headerlength = fileIntPluck(gma2, 0x04);
-	uint32_t gma2datalength = gma2filelength - gma2headerlength;
 
 
 	//The GMA1 bytes need no shifts as it comes first
