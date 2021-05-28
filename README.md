@@ -18,3 +18,6 @@ Each of these saves extracted data to unique and readable gma and tpl files, and
 * Fixed a bug where extracted textures would sometimes appear corrupted
 * Works with files that have empty header entries / unnamed models
 * Added option to list out models and then choose which one to extract
+
+### Compiling
+* g++ main.cpp gmatool.cpp -o gmatool.exe
