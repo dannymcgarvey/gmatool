@@ -27,6 +27,7 @@
 #define SWITCH_EXTRACT 2
 #define SPECIFIC_MODEL 3
 #define LIST_MODELS 4
+#define LIST_AND_EXTRACT 5
 
 constexpr bool isLittleEndian();
 uint32_t fileIntPluck (std::ifstream& bif, uint32_t offset);
@@ -40,7 +41,7 @@ uint32_t getModelNameLength(std::ifstream& bif, uint32_t modelnameoffset);
 void padZeroes(std::ofstream& bof, uint32_t zeronumber);
 std::string readNameFromGma(std::ifstream& gma, uint32_t modellistpointer, uint32_t modelnamelength);
 
-int modelNumberWithEmpties(std::ifstream& oldgma, int modelnumber);
+size_t modelNumberWithEmpties(std::ifstream& oldgma, size_t modelnumber);
 size_t modelAmountWithoutEmpties(std::ifstream& oldgma, size_t modelamount);
 size_t indexOfFinalNonEmptyEntry(std::ifstream& oldgma, size_t modelamount);
 size_t nextNonEmptyTextureOffset(std::ifstream& oldtpl, uint32_t headerposition);
@@ -62,12 +63,16 @@ int main(int argc, char **argv) {
 	} else {
 
 		std::string operationtype(argv[1]);
-
-		// Choose model to extract
-		if (operationtype == "-le" && argc == 3) {
+		if (operationtype == "-l" && argc == 3) {
 			
 			std::string filename(argv[2]);
 			successval = modelExtract(filename, LIST_MODELS, "");
+
+		// Choose model to extract
+		} else if (operationtype == "-le" && argc == 3) {
+			
+			std::string filename(argv[2]);
+			successval = modelExtract(filename, LIST_AND_EXTRACT, "");
 
 		// Extract Goals
 		} else if (operationtype == "-ge" && argc == 3) {
@@ -265,7 +270,7 @@ void modelWriteToFiles(std::string filename, std::ifstream& oldgma, std::ifstrea
 
 		// Texture position in the original tpl
 		uint16_t oldtexturevalue = texturearray[texturenumber];
-		uint32_t oldtextureheaderpos =  oldtexturevalue*0x10+0x04;
+		uint32_t oldtextureheaderpos =  oldtexturevalue * 0x10 + 0x04;
 
 		
 		// Save start point of texture data
@@ -316,11 +321,11 @@ void modelWriteToFiles(std::string filename, std::ifstream& oldgma, std::ifstrea
 		saveIntToFileEnd(newtpl, rollingoffset);
 
 		// Copy the rest of the data in the texture header
-		copyBytes(oldtpl, newtpl,  oldtextureheaderpos+0x08, 0x08);
+		copyBytes(oldtpl, newtpl,  oldtextureheaderpos + 0x08, 0x08);
 	}
 
 	//padding with the 00010203... pattern
-	uint8_t tplpaddingamount = (- 0x04 + (0x10*textureamount)) % 0x20;
+	uint8_t tplpaddingamount = (0x10 * textureamount - 0x04) % 0x20;
 	for (uint8_t tplpaddingpointer = 0; tplpaddingpointer < tplpaddingamount; tplpaddingpointer++) {
 		newtpl << tplpaddingpointer;
 	}
@@ -363,9 +368,6 @@ int modelExtract(std::string filename, int type, std::string specificmodel) {
 	uint32_t modellistoffset = modelamount * 0x8 + 0x8; //Start of model list - 0x8 initial bytes plus 0x8 for each model
 	uint32_t modellistpointer = modellistoffset;
 
-	uint32_t modelnamelength = 0;
-	std::string modelname = "";
-
 	if (type == GOAL_EXTRACT) {
 		//Goal extraction block
 
@@ -374,7 +376,7 @@ int modelExtract(std::string filename, int type, std::string specificmodel) {
 		for (size_t modelnumber = 0; modelnumber < nonemptymodelamount; modelnumber++) {
 
 			// Read model name from model list
-			modelnamelength = getModelNameLength(gma, modellistpointer);
+			uint32_t modelnamelength = getModelNameLength(gma, modellistpointer);
 			std::string modelname = readNameFromGma(gma, modellistpointer, modelnamelength);
 
 			if (modelname.find("GOAL") != std::string::npos) {
@@ -421,7 +423,7 @@ int modelExtract(std::string filename, int type, std::string specificmodel) {
 		for (size_t modelnumber = 0; modelnumber < nonemptymodelamount; modelnumber++) {
 
 			// Read model name from model list
-			modelnamelength = getModelNameLength(gma, modellistpointer);
+			uint32_t modelnamelength = getModelNameLength(gma, modellistpointer);
 			std::string modelname = readNameFromGma(gma, modellistpointer, modelnamelength);
 
 			if (modelname.substr(0,7) == "BUTTON_") {
@@ -445,7 +447,7 @@ int modelExtract(std::string filename, int type, std::string specificmodel) {
 		for (size_t modelnumber = 0; modelnumber < nonemptymodelamount; modelnumber++) {
 
 			// Read model name from model list
-			modelnamelength = getModelNameLength(gma, modellistpointer);
+			uint32_t modelnamelength = getModelNameLength(gma, modellistpointer);
 			std::string modelname = readNameFromGma(gma, modellistpointer, modelnamelength);
 
 			if (modelname == specificmodel) {
@@ -462,14 +464,14 @@ int modelExtract(std::string filename, int type, std::string specificmodel) {
 			std::cout << "The model " << specificmodel << " wasn't found!";
 			result = 1;
 		}
-	} else if (type == LIST_MODELS) {
+	} else if (type == LIST_MODELS || type == LIST_AND_EXTRACT) {
 		//Specify which model to extract.
 		std::cout << filename << " models:" << std::endl;
 
 		for (size_t modelnumber = 0; modelnumber < nonemptymodelamount; modelnumber++) {
 
 			// Read model name from model list
-			modelnamelength = getModelNameLength(gma, modellistpointer);
+			uint32_t modelnamelength = getModelNameLength(gma, modellistpointer);
 			std::string modelname = readNameFromGma(gma, modellistpointer, modelnamelength);
 
 			//Print out model name
@@ -478,17 +480,19 @@ int modelExtract(std::string filename, int type, std::string specificmodel) {
 			// Advance model list pointer
 			modellistpointer += modelnamelength;
 		}
-
-		// User inputs model name
-		std::string chosenmodel;
-		std::cout << std::endl << "Choose a model to extract: >";
-		std::cin >> chosenmodel;
-
-		// Restart with the chosen model
+		
 		gma.close();
 		tpl.close();
-		return modelExtract(filename, SPECIFIC_MODEL, chosenmodel);
-
+		if (type == LIST_AND_EXTRACT) {
+			// User inputs model name
+			std::string chosenmodel;
+			std::cout << std::endl << "Choose a model to extract: >";
+			std::cin >> chosenmodel;
+			return modelExtract(filename, SPECIFIC_MODEL, chosenmodel);
+		} else {
+			return 0;
+		}
+		
 	}
 	gma.close();
 	tpl.close();
@@ -532,6 +536,13 @@ int gmatplMerge(std::string filename1, std::string filename2) {
 
 	std::cout << "Merging GMAs and TPLs " << filename1 << " and " << filename2 << "..." << std::endl;
 
+	std::size_t slashPos = filename2.find_last_of('\\');
+	if (slashPos == std::string::npos) {
+		slashPos = filename2.find_last_of('/');
+	}
+	if (slashPos != std::string::npos) {
+		filename2 = filename2.substr(slashPos+1);
+	}
 	//Remove old files
 	remove((filename1 + "+" + filename2 + ".tpl").c_str());
 	remove((filename1 + "+" + filename2 + ".gma").c_str());
@@ -540,6 +551,7 @@ int gmatplMerge(std::string filename1, std::string filename2) {
 
 	//append number of models
 	std::ofstream newgma(filename1 + "+" + filename2 + ".gma", std::ios::binary | std::ios::app);
+	std::cout << "Writing to " + filename1 + "+" + filename2 + ".gma\n";
 	uint32_t gma1modelamount = fileIntPluck(gma1, 0x0);
 	uint32_t gma2modelamount = fileIntPluck(gma2, 0x0);
 	uint32_t newgmamodelamount = gma1modelamount + gma2modelamount;
@@ -714,7 +726,7 @@ int gmatplMerge(std::string filename1, std::string filename2) {
 	uint32_t tpl2length = getFileLength(tpl2);
 
 	//Now to work out the new file header length 
-	uint8_t newtplpaddingamount = (- 0x04 + (0x10*newtpltextureamount)) % 0x20;
+	uint8_t newtplpaddingamount = ((0x10*newtpltextureamount) - 0x04) % 0x20;
 	uint32_t newtplheaderlength = 0x04 + (0x10*newtpltextureamount) + newtplpaddingamount;
 	
 
@@ -842,7 +854,8 @@ void helpText() {
 		<< "\"-ge <name>\" - Extracts goal data from <name>.gma and <name>.tpl.\n"
 		<< "\"-se <name>\" - Extracts switch data from <name>.gma and <name>.tpl, saving each switch to unique files, including switch bases.\n"
 		<< "\"-me <name> <modelname>\" - Extracts the data of the model called \"modelname\" from <name>.gma and <name>.tpl.\n"
-		<< "\"-le <name>\" - Lists all models in <name>.gma, then accepts a model name from command line. Works the same as \"-me\".\n"
+		<< "\"-l <name>\" - Lists all models in <name>.gma.\n"
+		<< "\"-le <name>\" - Lists all models in <name>.gma, then accepts a model name from command line. Combines the functionality of \"-l\" and \"-me\".\n"
 		<< "\"-m <name1> <name2>\" - Extracts all data from <name1>.gma, <name2>.gma, <name1>.tpl and <name2>.tpl, and combines the data. "
 		<< "The second file's data is always placed after the first." << std::endl;
 }
@@ -936,23 +949,18 @@ std::string readNameFromGma(std::ifstream& gma, uint32_t modellistpointer, uint3
 */
 
 // Convert from position in model list to position in header
-int modelNumberWithEmpties(std::ifstream& oldgma, int modelnumber) {
-
-	// Starts at -1 to deal with leading empty entries
-	int currententry = -1;
-	int entrywithempties = -1;
-
+size_t modelNumberWithEmpties(std::ifstream& oldgma, size_t modelnumber) {
+	size_t currententry = 0;
+	size_t entrywithempties = 0;
 	// Keep separate counts for empty and nonempty entries, stopping when we find our original nonempty model
-	while (currententry < modelnumber) {
-		entrywithempties++;
-		uint32_t emptyIndicator = fileIntPluck(oldgma, 0x08 + 0x8 * entrywithempties);
+	while (currententry <= modelnumber) {
+		uint32_t emptyIndicator = fileIntPluck(oldgma, 0x8 * entrywithempties);
 		if (emptyIndicator != 0xffffffff) {
 			currententry++;
 		}
-		
+		entrywithempties++;
 	}
-
-	return entrywithempties;
+	return entrywithempties - 1; // counter goes over by one
 }
 
 // Index of the last model header entry that isn't an empty entry
