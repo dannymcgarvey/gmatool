@@ -855,7 +855,7 @@ void helpText() {
 		<< "\"-se <name>\" - Extracts switch data from <name>.gma and <name>.tpl, saving each switch to unique files, including switch bases.\n"
 		<< "\"-me <name> <modelname>\" - Extracts the data of the model called \"modelname\" from <name>.gma and <name>.tpl.\n"
 		<< "\"-l <name>\" - Lists all models in <name>.gma.\n"
-		<< "\"-le <name>\" - Lists all models in <name>.gma, then accepts a model name from command line. Combines the functionality of \"-l\" and \"-me\".\n"
+		<< "\"-le <name>\" - Combines the functionality of \"-l\" and \"-me\".\n"
 		<< "\"-m <name1> <name2>\" - Extracts all data from <name1>.gma, <name2>.gma, <name1>.tpl and <name2>.tpl, and combines the data. "
 		<< "The second file's data is always placed after the first." << std::endl;
 }
